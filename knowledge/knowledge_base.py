@@ -69,18 +69,16 @@ class KnowledgeBase:
                 continue  # Skip index files
 
             incident_id = md_file.stem
-            if self.use_chromadb and self._is_incident_loaded(incident_id):
-                continue
+            already_loaded = self.use_chromadb and self._is_incident_loaded(incident_id)
 
             try:
                 content = self._parse_incident_file(md_file)
+                content['id'] = incident_id
 
-                if self.use_chromadb:
+                # Store in memory for fallback matching and internal use
+                self.incidents.append(content)
+                if self.use_chromadb and not already_loaded:
                     self._add_to_vector_store(incident_id, content)
-                else:
-                    # Store in memory
-                    content['id'] = incident_id
-                    self.incidents.append(content)
 
                 logger.info(f"Loaded incident {incident_id}")
             except Exception as e:
@@ -162,6 +160,16 @@ class KnowledgeBase:
         except:
             return False
 
+    def _compute_text_similarity(self, source: str, target: str) -> float:
+        """Compute a similarity score using ratio and keyword overlap."""
+        source_words = set(re.findall(r"\w+", source.lower()))
+        target_words = set(re.findall(r"\w+", target.lower()))
+        overlap = len(source_words & target_words)
+        keyword_score = overlap / max(1, len(source_words))
+
+        ratio_score = SequenceMatcher(None, source.lower(), target.lower()).ratio()
+        return 0.6 * ratio_score + 0.4 * keyword_score
+
     async def find_similar_incidents(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
         """Find similar incidents using semantic search"""
         if self.use_chromadb:
@@ -172,32 +180,48 @@ class KnowledgeBase:
                     include=['metadatas', 'documents', 'distances']
                 )
 
-                similar_incidents = []
+                candidate_map = {}
                 for i, incident_id in enumerate(results['ids'][0]):
                     metadata = results['metadatas'][0][i]
                     distance = results['distances'][0][i]
+                    similarity_score = 1.0 - distance if isinstance(distance, (int, float)) else 0.0
+                    similarity_score = max(0.0, min(1.0, similarity_score))
 
-                    similar_incidents.append({
+                    candidate_map[incident_id] = {
                         'id': incident_id,
                         'system': metadata.get('system', 'Unknown'),
                         'type': metadata.get('type', 'other'),
                         'severity': metadata.get('severity', 'medium'),
-                        'similarity_score': 1.0 - distance,  # Convert distance to similarity
-                        'description': results['documents'][0][i][:200] + "..."  # Truncate
-                    })
+                        'similarity_score': similarity_score,
+                        'description': results['documents'][0][i][:200] + "..."
+                    }
 
+                # Add local text similarity fallback to catch keyword-rich matches
+                for incident in self.incidents:
+                    local_text = f"{incident['title']} {incident['description']}"
+                    local_score = self._compute_text_similarity(query, local_text)
+                    if local_score > candidate_map.get(incident['id'], {}).get('similarity_score', 0.0):
+                        candidate_map[incident['id']] = {
+                            'id': incident['id'],
+                            'system': incident.get('system', 'Unknown'),
+                            'type': incident.get('type', 'other'),
+                            'severity': incident.get('severity', 'medium'),
+                            'similarity_score': local_score,
+                            'description': incident['description'][:200] + "..." if len(incident['description']) > 200 else incident['description']
+                        }
+
+                similar_incidents = sorted(candidate_map.values(), key=lambda item: item['similarity_score'], reverse=True)[:limit]
                 return similar_incidents
             except Exception as e:
                 logger.error(f"Error finding similar incidents: {e}")
                 return []
         else:
-            # Simple text similarity using difflib
-            query_lower = query.lower()
+            # Simple text similarity using difflib plus keyword matching
             similarities = []
 
             for incident in self.incidents:
-                text = f"{incident['title']} {incident['description']}".lower()
-                similarity = SequenceMatcher(None, query_lower, text).ratio()
+                text = f"{incident['title']} {incident['description']}"
+                similarity = self._compute_text_similarity(query, text)
                 similarities.append((incident, similarity))
 
             # Sort by similarity and take top results
