@@ -1,0 +1,17 @@
+1) Para Converter template da page do OneNote (apenas 1 incidente!) exportado para um docx para um ficheiro MD e com as imagens movidas para subfolder media. 
+No git bash:
+
+	pandoc "OneNote/INC000xxxxxxx.docx" \
+	  -t markdown \
+	  -o "knowledge/incidents/INC000xxxxxxx.md" \
+	  --extract-media="knowledge/incidents/INC000xxxxxxx_media"
+
+	# o pandoc cria uma pasta media a mais: knowledge/incidents/INC000xxxxxxx_media/media/png - executar para mover os ficheiros para um nível acima 
+	for d in knowledge/incidents/*_media; do
+	  if [ -d "$d/media" ]; then
+		mv "$d/media"/* "$d/"
+		rm -rf "$d/media"
+	  fi
+	done  
+ 
+----------------------------
