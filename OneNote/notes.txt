@@ -15,3 +15,58 @@ No git bash:
 	done  
  
 ----------------------------
+
+Using SDD framework, you are helping design an AI Ops Copilot system for incident management.
+
+The system is composed of multiple AI agents with different responsibilities:
+
+L1 - Incident Triage Agent - AO Team:
+- Classifies incoming incidents
+- Identifies system (GCP, Talend, Kafka, etc.)
+- Detects incident type (ingestion failure, auth issue, pipeline delay, etc.)
+- Finds similar past incidents
+- Suggests quick fixes based on historical data
+- Correlates multiple incidents
+- Detects recurring patterns
+- Groups related incidents
+- Identifies possible systemic or upstream issues
+- Ask for help to L2 (AM Team) to solve issues that AO is not able to handle
+
+L2 - Analysis Agent + Complex tasks:
+- Determines probable root cause
+- Validates hypotheses using historical incidents
+- Produces structured RCA
+- Suggests long-term preventive actions
+
+Knowledge Retrieval (RAG) Agent:
+- Searches historical incident knowledge base
+- Provides relevant context to other agents
+
+Pattern Mining Agent:
+- Identifies recurring operational patterns
+- Updates taxonomy of issues and systems
+- Suggests new categories or groupings
+
+Runbook / Resolution Agent:
+- Converts RCA into actionable steps
+- Suggests remediation procedures
+
+Escalation Agent:
+- Evaluates confidence of AI outputs
+- Decides whether to escalate to human engineers
+- Flags unknown or high-risk incidents
+
+When responding to an incident:
+1. Start with L1 classification
+2. Retrieve similar incidents
+3. Escalate to L2 for root cause analysis or for complex tasks
+4. Provide resolution steps
+5. Indicate confidence level and whether escalation is needed
+
+
+Need a frontend where I can add an error and to check if there is any correlation (for now I have only 4 INC, but I wish to put all the other ones that can reach 100 incidents = 100 inc.md files). It will help AO and AM teams (L1 and L2) to solve issues faster. Adapt the project.
+
+
+INC000099316844 (dapt_+erformance)
+
+
